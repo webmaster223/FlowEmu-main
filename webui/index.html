@@ -1,0 +1,596 @@
+<!--
+ * FlowEmu - Flow-Based Network Emulator
+ * Copyright (c) 2021 Institute of Communication Networks (ComNets),
+ *                    Hamburg University of Technology (TUHH),
+ *                    https://www.tuhh.de/comnets
+ * Copyright (c) 2021 Daniel Stolpmann <daniel.stolpmann@tuhh.de>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+-->
+
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+
+		<link rel="icon" type="image/svg+xml" href="favicon.svg" sizes="any">
+
+		<title>FlowEmu</title>
+
+		<link rel="stylesheet" href="css/reset.css">
+		<link rel="stylesheet" href="css/ui.css">
+		<link rel="stylesheet" href="js/node_editor/node_editor.css">
+
+		<script src="js/utils/utils.js"></script>
+		<script src="js/node_editor/node_editor.js"></script>
+		<script src="js/chart/chart.umd.js"></script>
+		<script src="js/mqtt/mqttjs.js"></script>
+		<script src="js/mqtt/mqtt.js"></script>
+	</head>
+	<body>
+		<div class="header">
+			<img class="logo" src="img/flowemu_logo.png">
+
+			<div class="filler"></div>
+
+			<div class="graph_loadsave">
+				<select id="graphs_list"></select>
+				<div class="button" id="graph_load">Load</div>
+
+				<input id="graph_filename"></input>
+				<div class="button" id="graph_save">Save</div>
+			</div>
+		</div>
+
+		<div class="content">
+			<div class="sidebar sidebar_left">
+				<div id="node_library"></div>
+				<div id="library_hide_button" class="hide_button"><</div>
+			</div>
+			<div id="node_editor"></div>
+			<div class="sidebar sidebar_right">
+				<div id="settings_hide_button" class="hide_button">></div>
+				<div id="node_settings" class="node_settings">
+					<canvas id="queue_chart" width="400" height="250"></canvas>
+					<canvas id="delay_chart" width="400" height="250"></canvas>
+					<canvas id="throughput_chart" width="400" height="250"></canvas>
+				</div>
+			</div>
+		</div>
+
+		<script>
+			var node_editor = new NodeEditor("#node_editor");
+
+			var node_parameter_subscriptions = {};
+			var node_parameter_options_subscriptions = {};
+			var node_statistic_subscriptions = {};
+
+			subscribe("get/module/+", function(topic, message) {
+				var r = new RegExp("get\\/module\\/(\\w+)");
+				var m;
+				if((m = r.exec(topic)) === null) {
+					return;
+				}
+				var node_id = m[1];
+
+				var node_data = (message.length > 0 ? JSON.parse(message) : null);
+
+				if(node_id in node_editor.nodes) {
+					if(node_data !== null) {
+						node_editor.updateNode(node_id, node_data, "mqtt_node_update");
+					} else {
+						node_editor.removeNode(node_editor.nodes[node_id], "mqtt_node_remove");
+					}
+				} else if(node_data !== null) {
+					var node = new Node(node_id);
+					node.deserialize(node_data);
+					node_editor.addNode(node, "mqtt_node_add");
+				}
+			});
+
+			subscribe("get/paths", function(topic, message) {
+				var paths_data = (message.length > 0 ? JSON.parse(message) : null);
+
+				if(paths_data) {
+					node_editor.updatePaths(paths_data, "mqtt_path_update");
+				}
+			});
+
+			node_editor.setNodeAddHandler(function(node, callback_data) {
+				if(callback_data != "mqtt_node_add") {
+					publish("set/module/" + node.id, node.serialize());
+				}
+			});
+
+			node_editor.setNodeChangeHandler(function(node, callback_data) {
+				if(callback_data != "mqtt_node_update") {
+					publish("set/module/" + node.id, node.serialize());
+				}
+			});
+
+			node_editor.setNodeRemoveHandler(function(node, callback_data) {
+				if(callback_data != "mqtt_node_remove") {
+					publish("set/paths", node_editor.serializePaths());
+					publish("set/module/" + node.id, null);
+				}
+			});
+
+			node_editor.setPathAddHandler(function(path, callback_data) {
+				if(callback_data != "mqtt_path_update") {
+					publish("set/paths", node_editor.serializePaths());
+				}
+			});
+
+			node_editor.setPathRemoveHandler(function(path, callback_data) {
+				if(callback_data != "mqtt_path_update" && callback_data != "node_remove") {
+					publish("set/paths", node_editor.serializePaths());
+				}
+			});
+
+			node_editor.setParameterAddHandler(function(node, id) {
+				node_parameter_subscriptions[node.id + "." + id] = subscribe("get/module/" + node.id + "/" + id, function(topic, message) {
+					if(node.id in node_editor.nodes && id in node_editor.nodes[node.id].parameters) {
+						var parameter = node_editor.nodes[node.id].parameters[id];
+						
+						if(parameter instanceof NodeContentParameterDouble) {
+							parameter.setValue(parseFloat(message));
+						} else if(parameter instanceof NodeContentParameterBool) {
+							parameter.setValue(parseInt(message) != 0);
+						} else if(parameter instanceof NodeContentParameterString) {
+							parameter.setValue(message);
+						} else if(parameter instanceof NodeContentParameterStringSelect) {
+							parameter.setValue(message);
+						}
+					}
+				});
+
+				var parameter = node_editor.nodes[node.id].parameters[id];
+				if(parameter instanceof NodeContentParameterStringSelect) {
+					node_parameter_options_subscriptions[node.id + "." + id] = subscribe("get/module/" + node.id + "/" + id + "/options", function(topic, message) {
+						parameter.setOptions(message.length > 0 ? JSON.parse(message) : []);
+					});
+				}
+			});
+
+			node_editor.setParameterChangeHandler(function(node, parameter_id, value) {
+				publish("set/module/" + node.id + "/" + parameter_id, value.toString());
+			});
+
+			node_editor.setParameterRemoveHandler(function(node, id) {
+				unsubscribeByReference(node_parameter_subscriptions[node.id + "." + id]);
+
+				var parameter = node_editor.nodes[node.id].parameters[id];
+				if(parameter instanceof NodeContentParameterStringSelect) {
+					unsubscribeByReference(node_parameter_options_subscriptions[node.id + "." + id]);
+				}
+			});
+
+			node_editor.setStatisticAddHandler(function(node, id) {
+				node_statistic_subscriptions[node.id + "." + id] = subscribe("get/module/" + node.id + "/" + id, function(topic, message) {
+					if(node.id in node_editor.nodes && id in node_editor.nodes[node.id].statistics) {
+						node_editor.nodes[node.id].statistics[id].setValue(parseFloat(message));
+					}
+				});
+			});
+
+			node_editor.setStatisticRemoveHandler(function(node, id) {
+				unsubscribeByReference(node_statistic_subscriptions[node.id + "." + id]);
+			});
+
+			subscribe("get/graphs", function(topic, message) {
+				var graphs = (message.length > 0 ? JSON.parse(message) : []);
+				graphs = graphs.sort();
+
+				var graphs_list = document.getElementById("graphs_list");
+				graphs_list.innerHTML = "";
+				graphs.forEach(function(item) {
+					var option = document.createElement("option");
+					option.value = item;
+					option.text = item;
+					graphs_list.appendChild(option);
+				});
+			});
+
+			document.getElementById("graphs_list").addEventListener("change", function(e) {
+				document.getElementById("graph_filename").value = this.value;
+			});
+
+			document.getElementById("graph_load").addEventListener("click", function(e) {
+				publish("set/load", document.getElementById("graphs_list").value);
+			});
+
+			document.getElementById("graph_save").addEventListener("click", function(e) {
+				publish("set/save", document.getElementById("graph_filename").value);
+			});
+
+			var node_library = new NodeLibrary("#node_library");
+			node_library.connectNodeEditor(node_editor);
+
+			var loss_group = new NodeLibraryGroup("Loss");
+
+			var uncorrelated_loss = new Node("uncorrelated_loss");
+			uncorrelated_loss.setType("uncorrelated_loss");
+			uncorrelated_loss.setTitle("Uncorrelated Loss");
+			var flow = new NodeContentFlow();
+			flow.addPort("left", new Port("lr_in", "receiving", "In"));
+			flow.addPort("left", new Port("rl_out", "sending", "Out"));
+			flow.addPort("right", new Port("lr_out", "sending", "Out"));
+			flow.addPort("right", new Port("rl_in", "receiving", "In"));
+			uncorrelated_loss.addContentItem(flow);
+			loss_group.addNode(uncorrelated_loss);
+
+			var gilbert_elliot_loss = new Node("gilbert_elliot_loss");
+			gilbert_elliot_loss.setType("gilbert_elliot_loss");
+			gilbert_elliot_loss.setTitle("Gilbert-Elliot Loss");
+			var flow = new NodeContentFlow();
+			flow.addPort("left", new Port("lr_in", "receiving", "In"));
+			flow.addPort("left", new Port("rl_out", "sending", "Out"));
+			flow.addPort("right", new Port("lr_out", "sending", "Out"));
+			flow.addPort("right", new Port("rl_in", "receiving", "In"));
+			gilbert_elliot_loss.addContentItem(flow);
+			loss_group.addNode(gilbert_elliot_loss);
+
+			node_library.addGroup(loss_group);
+
+
+			var delay_group = new NodeLibraryGroup("Delay");
+
+			var fixed_delay = new Node("fixed_delay");
+			fixed_delay.setType("fixed_delay");
+			fixed_delay.setTitle("Fixed Delay");
+			var flow = new NodeContentFlow();
+			flow.addPort("left", new Port("lr_in", "receiving", "In"));
+			flow.addPort("left", new Port("rl_out", "sending", "Out"));
+			flow.addPort("right", new Port("lr_out", "sending", "Out"));
+			flow.addPort("right", new Port("rl_in", "receiving", "In"));
+			fixed_delay.addContentItem(flow);
+			delay_group.addNode(fixed_delay);
+
+			node_library.addGroup(delay_group);
+
+
+			var queue_group = new NodeLibraryGroup("Queue");
+
+			/* var dql_queue = new Node("dql_queue");
+			dql_queue.setType("dql_queue");
+			dql_queue.setTitle("DQL Queue");
+			var flow = new NodeContentFlow();
+			flow.addPort("left", new Port("in", "receiving", "In"));
+			flow.addPort("right", new Port("out", "responding", "Out"));
+			dql_queue.addContentItem(flow);
+			queue_group.addNode(dql_queue); */
+
+			var fifo_queue = new Node("fifo_queue");
+			fifo_queue.setType("fifo_queue");
+			fifo_queue.setTitle("FIFO Queue");
+			var flow = new NodeContentFlow();
+			flow.addPort("left", new Port("in", "receiving", "In"));
+			flow.addPort("right", new Port("out", "responding", "Out"));
+			fifo_queue.addContentItem(flow);
+			queue_group.addNode(fifo_queue);
+
+			node_library.addGroup(queue_group);
+
+
+			var rate_group = new NodeLibraryGroup("Rate");
+
+			var bitrate_rate = new Node("bitrate_rate");
+			bitrate_rate.setType("bitrate_rate");
+			bitrate_rate.setTitle("Bitrate Rate");
+			var flow = new NodeContentFlow();
+			flow.addPort("left", new Port("in", "requesting", "In"));
+			flow.addPort("right", new Port("out", "sending", "Out"));
+			bitrate_rate.addContentItem(flow);
+			rate_group.addNode(bitrate_rate);
+
+			var fixed_interval_rate = new Node("fixed_interval_rate");
+			fixed_interval_rate.setType("fixed_interval_rate");
+			fixed_interval_rate.setTitle("Fixed Interval Rate");
+			var flow = new NodeContentFlow();
+			flow.addPort("left", new Port("lr_in", "requesting", "In"));
+			flow.addPort("left", new Port("rl_out", "sending", "Out"));
+			flow.addPort("right", new Port("lr_out", "sending", "Out"));
+			flow.addPort("right", new Port("rl_in", "requesting", "In"));
+			fixed_interval_rate.addContentItem(flow);
+			rate_group.addNode(fixed_interval_rate);
+
+			var trace_rate = new Node("trace_rate");
+			trace_rate.setType("trace_rate");
+			trace_rate.setTitle("Trace Rate");
+			var flow = new NodeContentFlow();
+			flow.addPort("left", new Port("lr_in", "requesting", "In"));
+			flow.addPort("left", new Port("rl_out", "sending", "Out"));
+			flow.addPort("right", new Port("lr_out", "sending", "Out"));
+			flow.addPort("right", new Port("rl_in", "requesting", "In"));
+			trace_rate.addContentItem(flow);
+			rate_group.addNode(trace_rate);
+
+			node_library.addGroup(rate_group);
+
+
+			var meter_group = new NodeLibraryGroup("Meter");
+
+			var delay_meter = new Node("delay_meter");
+			delay_meter.setType("delay_meter");
+			delay_meter.setTitle("Delay Meter");
+			var flow = new NodeContentFlow();
+			flow.addPort("left", new Port("in", "receiving", "In"));
+			flow.addPort("right", new Port("out", "sending", "Out"));
+			delay_meter.addContentItem(flow);
+			meter_group.addNode(delay_meter);
+
+			var throughput_meter = new Node("throughput_meter");
+			throughput_meter.setType("throughput_meter");
+			throughput_meter.setTitle("Throughput Meter");
+			var flow = new NodeContentFlow();
+			flow.addPort("left", new Port("in", "receiving", "In"));
+			flow.addPort("right", new Port("out", "sending", "Out"));
+			throughput_meter.addContentItem(flow);
+			meter_group.addNode(throughput_meter);
+
+			node_library.addGroup(meter_group);
+
+			document.getElementById("library_hide_button").addEventListener("click", function(e) {
+				if(node_library.element.classList.contains("hidden")) {
+					node_library.element.classList.remove("hidden");
+					this.textContent = "<";
+				} else {
+					node_library.element.classList.add("hidden");
+					this.textContent = ">";
+				}
+			});
+
+
+			const chart_start_timestamp = Date.now();
+			const chart_total_time = 30;
+
+			function chartAddDatapoint(dataset, value) {
+				if(isNaN(value)) {
+					dataset.data = [];
+					return;
+				}
+
+				const now = (Date.now() - chart_start_timestamp) / 1000;
+
+				dataset.data.pop();
+				for(let i = 0; i < 2; i++) {
+					dataset.data.push({x: now, y: value});
+				}
+			}
+
+			function chartUpdate(chart) {
+				const x_max = (Date.now() - chart_start_timestamp) / 1000;
+				const x_min = x_max - chart_total_time;
+
+				chart.data.datasets.forEach(function(dataset) {
+					if(dataset.data.length == 0) {
+						return;
+					}
+
+					const first_visible_index = dataset.data.findIndex(item => item.x >= x_min);
+					if(first_visible_index > 0) {
+						dataset.data = dataset.data.slice(first_visible_index - 1);
+					}
+
+					dataset.data[0].x = Math.max(dataset.data[0].x, x_min);
+					dataset.data[dataset.data.length - 1].x = x_max;
+				});
+
+				chart.options.scales.x.min = x_min;
+				chart.options.scales.x.max = x_max;
+
+				chart.update();
+			}
+
+
+			var queue_ctx = document.getElementById('queue_chart').getContext('2d');
+			var queue_chart = new Chart(queue_ctx, {
+				type: 'scatter',
+				data: {
+					datasets: [{
+						label: 'Queue Length',
+						data: [],
+						stepped: true,
+						borderColor: 'orange',
+						showLine: true,
+					}]
+				},
+				options: {
+					animation: false,
+					scales: {
+						x: {
+							display: false
+						},
+						y: {
+							display: true,
+							title: {
+								display: true,
+								text: "Packets"
+							},
+							ticks: {
+								callback: formatValue,
+							}
+						}
+					},
+					plugins: {
+						tooltip: {
+							callbacks: {
+								label: chartTooltip.bind({unit: "packets"})
+							}
+						}
+					}
+				}
+			});
+
+			subscribe("get/module/fifo_queue/queue_length", function(topic, message) {
+				chartAddDatapoint(queue_chart.data.datasets[0], parseFloat(message));
+			});
+
+			setInterval(function() {
+				chartUpdate(queue_chart);
+			}, 100);
+
+
+			var delay_ctx = document.getElementById('delay_chart').getContext('2d');
+			var delay_chart = new Chart(delay_ctx, {
+				type: 'scatter',
+				data: {
+					datasets: [{
+						label: 'Mean Delay',
+						data: [],
+						stepped: true,
+						borderColor: 'orange',
+						showLine: true,
+					},{
+						label: 'Min. Delay',
+						data: [],
+						stepped: true,
+						borderColor: 'rebeccapurple',
+						showLine: true,
+					},{
+						label: 'Max. Delay',
+						data: [],
+						stepped: true,
+						borderColor: 'rebeccapurple',
+						showLine: true,
+					}]
+				},
+				options: {
+					animation: false,
+					scales: {
+						x: {
+							display: false
+						},
+						y: {
+							display: true,
+							title: {
+								display: true,
+								text: "ms"
+							},
+							ticks: {
+								callback: formatValue,
+							}
+						}
+					},
+					plugins: {
+						tooltip: {
+							callbacks: {
+								label: chartTooltip.bind({unit: "ms"})
+							}
+						}
+					}
+				}
+			});
+
+			subscribe("get/module/delay_meter/mean", function(topic, message) {
+				chartAddDatapoint(delay_chart.data.datasets[0], parseFloat(message));
+			});
+
+			subscribe("get/module/delay_meter/min", function(topic, message) {
+				chartAddDatapoint(delay_chart.data.datasets[1], parseFloat(message));
+			});
+
+			subscribe("get/module/delay_meter/max", function(topic, message) {
+				chartAddDatapoint(delay_chart.data.datasets[2], parseFloat(message));
+			});
+
+			setInterval(function() {
+				chartUpdate(delay_chart);
+			}, 100);
+
+
+			var throughput_ctx = document.getElementById('throughput_chart').getContext('2d');
+			var throughput_chart = new Chart(throughput_ctx, {
+				type: 'scatter',
+				data: {
+					datasets: [{
+						label: 'Bits/s',
+						yAxisID: 'y',
+						data: [],
+						stepped: true,
+						borderColor: 'orange',
+						showLine: true
+					}, {
+						label: 'Packets/s',
+						yAxisID: 'y1',
+						data: [],
+						stepped: true,
+						borderColor: 'rebeccapurple',
+						showLine: true
+					}]
+				},
+				options: {
+					animation: false,
+					scales: {
+						x: {
+							display: false
+						},
+						y: {
+							display: true,
+							title: {
+								display: true,
+								text: "Bits/s"
+							},
+							position: 'left',
+							ticks: {
+								callback: formatValue,
+							}
+						},
+						y1: {
+							display: true,
+							title: {
+								display: true,
+								text: "Packets/s"
+							},
+							position: 'right',
+							ticks: {
+								callback: formatValue,
+							}
+						}
+					},
+					plugins: {
+						tooltip: {
+							callbacks: {
+								label: chartTooltip
+							}
+						}
+					}
+				}
+			});
+
+			subscribe("get/module/throughput_meter/bits_per_second", function(topic, message) {
+				chartAddDatapoint(throughput_chart.data.datasets[0], parseFloat(message));
+			});
+
+			subscribe("get/module/throughput_meter/packets_per_second", function(topic, message) {
+				chartAddDatapoint(throughput_chart.data.datasets[1], parseFloat(message));
+			});
+
+			setInterval(function() {
+				chartUpdate(throughput_chart);
+			}, 100);
+
+			var node_settings = document.getElementById("node_settings");
+			document.getElementById("settings_hide_button").addEventListener("click", function(e) {
+				if(node_settings.classList.contains("hidden")) {
+					node_settings.classList.remove("hidden");
+					this.textContent = ">";
+				} else {
+					node_settings.classList.add("hidden");
+					this.textContent = "<";
+				}
+			});
+		</script>
+	</body>
+</html>

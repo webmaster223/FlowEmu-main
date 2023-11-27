@@ -1,0 +1,148 @@
+/*
+ * FlowEmu - Flow-Based Network Emulator
+ * Copyright (c) 2021 Institute of Communication Networks (ComNets),
+ *                    Hamburg University of Technology (TUHH),
+ *                    https://www.tuhh.de/comnets
+ * Copyright (c) 2021 Daniel Stolpmann <daniel.stolpmann@tuhh.de>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+html {
+	font-family: sans-serif;
+}
+
+body {
+	height: 100%;
+}
+
+body > .header {
+	display: flex;
+	align-items: center;
+
+	width: 100%;
+	height: 56px;
+
+	background: black;
+}
+
+body > .header > .logo {
+	margin: 12px;
+	height: 32px;
+}
+
+body > .header > a {
+	color: white;
+	font-size: 24px;
+
+	margin: 12px;
+}
+
+body > .header > .filler {
+	flex: 1 1 100%;
+}
+
+body > .header .graph_loadsave {
+	display: flex;
+	padding: 0 8px;
+}
+
+body > .header .graph_loadsave > * {
+	margin: 0 4px;
+}
+
+body > .header .graph_loadsave #graph_load {
+	margin-right: 12px;
+}
+
+body > .header .graph_loadsave select, body > .header .graph_loadsave input {
+	width: 150px;
+	outline: none;
+	border: none;
+
+	background: white;
+	color: black;
+}
+
+body > .header .graph_loadsave .button {
+	line-height: 32px;
+	padding: 0 16px;
+
+	background: rgb(50, 50, 50);
+	color: white;
+
+	user-select: none;
+}
+
+body > .header .graph_loadsave .button:hover {
+	background: rgb(55, 55, 55);
+}
+
+body > .header .graph_loadsave .button:active {
+	background: rgb(45, 45, 45);
+}
+
+body > .content {
+	position: relative;
+	width: 100%;
+	height: calc(100% - 56px);
+}
+
+body > .content .sidebar {
+	display: flex;
+	align-items: flex-start;
+
+	position: absolute;
+	top: 0;
+	height: 100%;
+
+	z-index: 1;
+}
+
+body > .content .sidebar_left {
+	left: 0;
+}
+
+body > .content .sidebar_right {
+	right: 0;
+}
+
+body > .content .node_library.hidden {
+	display: none;
+}
+
+body > .content .node_editor {
+	height: 100%;
+}
+
+body > .content .node_settings.hidden {
+	display: none;
+}
+
+.hide_button {
+	margin-top: 16px;
+	padding: 24px 8px;
+
+	background: rgb(25, 25, 25);
+	color: white;
+	user-select: none;
+}
+
+.hide_button:hover {
+	background: rgb(30, 30, 30);
+}
+
+.hide_button:active {
+	background: rgb(20, 20, 20);
+}

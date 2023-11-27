@@ -1,0 +1,537 @@
+{
+	"modules": 
+	{
+		"delay_meter": 
+		{
+			"content": 
+			[
+				{
+					"ports": 
+					{
+						"left": 
+						[
+							{
+								"id": "in",
+								"label": "In",
+								"type": "receiving"
+							}
+						],
+						"right": 
+						[
+							{
+								"id": "out",
+								"label": "Out",
+								"type": "sending"
+							}
+						]
+					},
+					"type": "flow"
+				},
+				{
+					"data_type": "double",
+					"id": "interval",
+					"label": "Interval",
+					"max": null,
+					"min": 0,
+					"step": 100,
+					"type": "parameter",
+					"unit": "ms",
+					"value": 100
+				},
+				{
+					"data_type": "double",
+					"id": "window_size",
+					"label": "Window",
+					"max": null,
+					"min": 0,
+					"step": 100,
+					"type": "parameter",
+					"unit": "ms",
+					"value": 1000
+				},
+				{
+					"id": "max",
+					"label": "Max.",
+					"type": "statistic",
+					"unit": "ms"
+				},
+				{
+					"id": "mean",
+					"label": "Mean",
+					"type": "statistic",
+					"unit": "ms"
+				},
+				{
+					"id": "min",
+					"label": "Min.",
+					"type": "statistic",
+					"unit": "ms"
+				}
+			],
+			"position": 
+			{
+				"x": 981,
+				"y": 153
+			},
+			"removable": true,
+			"size": 
+			{
+				"height": 210,
+				"width": 250
+			},
+			"title": "Delay Meter",
+			"type": "delay_meter"
+		},
+		"fifo_queue": 
+		{
+			"content": 
+			[
+				{
+					"ports": 
+					{
+						"left": 
+						[
+							{
+								"id": "in",
+								"label": "In",
+								"type": "receiving"
+							}
+						],
+						"right": 
+						[
+							{
+								"id": "out",
+								"label": "Out",
+								"type": "responding"
+							}
+						]
+					},
+					"type": "flow"
+				},
+				{
+					"data_type": "double",
+					"id": "buffer_size",
+					"label": "Buffer",
+					"max": null,
+					"min": 1,
+					"step": 1,
+					"type": "parameter",
+					"unit": "packets",
+					"value": 10
+				},
+				{
+					"id": "queue_length",
+					"label": "Queue",
+					"type": "statistic",
+					"unit": "packets"
+				}
+			],
+			"position": 
+			{
+				"x": 234,
+				"y": 155
+			},
+			"removable": true,
+			"size": 
+			{
+				"height": 126,
+				"width": 250
+			},
+			"title": "FIFO Queue",
+			"type": "fifo_queue"
+		},
+		"fixed_delay": 
+		{
+			"content": 
+			[
+				{
+					"ports": 
+					{
+						"left": 
+						[
+							{
+								"id": "lr_in",
+								"label": "In",
+								"type": "receiving"
+							},
+							{
+								"id": "rl_out",
+								"label": "Out",
+								"type": "sending"
+							}
+						],
+						"right": 
+						[
+							{
+								"id": "lr_out",
+								"label": "Out",
+								"type": "sending"
+							},
+							{
+								"id": "rl_in",
+								"label": "In",
+								"type": "receiving"
+							}
+						]
+					},
+					"type": "flow"
+				},
+				{
+					"data_type": "double",
+					"id": "delay",
+					"label": "Delay",
+					"max": null,
+					"min": 0,
+					"step": 10,
+					"type": "parameter",
+					"unit": "ms",
+					"value": 0
+				}
+			],
+			"position": 
+			{
+				"x": 608,
+				"y": 418
+			},
+			"removable": true,
+			"size": 
+			{
+				"height": 123,
+				"width": 250
+			},
+			"title": "Fixed Delay",
+			"type": "fixed_delay"
+		},
+		"fixed_interval_rate": 
+		{
+			"content": 
+			[
+				{
+					"ports": 
+					{
+						"left": 
+						[
+							{
+								"id": "lr_in",
+								"label": "In",
+								"type": "requesting"
+							},
+							{
+								"id": "rl_out",
+								"label": "Out",
+								"type": "sending"
+							}
+						],
+						"right": 
+						[
+							{
+								"id": "lr_out",
+								"label": "Out",
+								"type": "sending"
+							},
+							{
+								"id": "rl_in",
+								"label": "In",
+								"type": "requesting"
+							}
+						]
+					},
+					"type": "flow"
+				},
+				{
+					"data_type": "double",
+					"id": "interval",
+					"label": "Interval",
+					"max": null,
+					"min": 0,
+					"step": 1,
+					"type": "parameter",
+					"unit": "ms",
+					"value": 1
+				},
+				{
+					"data_type": "double",
+					"id": "rate",
+					"label": "Rate",
+					"max": null,
+					"min": 0,
+					"step": 1,
+					"type": "parameter",
+					"unit": "packets/s",
+					"value": 1000
+				}
+			],
+			"position": 
+			{
+				"x": 531,
+				"y": 155
+			},
+			"removable": true,
+			"size": 
+			{
+				"height": 159,
+				"width": 250
+			},
+			"title": "Fixed Interval Rate",
+			"type": "fixed_interval_rate"
+		},
+		"socket_sink": 
+		{
+			"content": 
+			[
+				{
+					"ports": 
+					{
+						"left": 
+						[
+							{
+								"id": "in",
+								"label": "In",
+								"type": "receiving"
+							},
+							{
+								"id": "out",
+								"label": "Out",
+								"type": "sending"
+							}
+						],
+						"right": []
+					},
+					"type": "flow"
+				}
+			],
+			"position": 
+			{
+				"x": 1319,
+				"y": 562
+			},
+			"removable": false,
+			"size": 
+			{
+				"height": 87,
+				"width": 250
+			},
+			"title": "Raw Socket",
+			"type": "raw_socket"
+		},
+		"socket_source": 
+		{
+			"content": 
+			[
+				{
+					"ports": 
+					{
+						"left": [],
+						"right": 
+						[
+							{
+								"id": "out",
+								"label": "Out",
+								"type": "sending"
+							},
+							{
+								"id": "in",
+								"label": "In",
+								"type": "receiving"
+							}
+						]
+					},
+					"type": "flow"
+				}
+			],
+			"position": 
+			{
+				"x": 22,
+				"y": 562
+			},
+			"removable": false,
+			"size": 
+			{
+				"height": 87,
+				"width": 250
+			},
+			"title": "Raw Socket",
+			"type": "raw_socket"
+		},
+		"throughput_meter": 
+		{
+			"content": 
+			[
+				{
+					"ports": 
+					{
+						"left": 
+						[
+							{
+								"id": "in",
+								"label": "In",
+								"type": "receiving"
+							}
+						],
+						"right": 
+						[
+							{
+								"id": "out",
+								"label": "Out",
+								"type": "sending"
+							}
+						]
+					},
+					"type": "flow"
+				},
+				{
+					"data_type": "double",
+					"id": "interval",
+					"label": "Interval",
+					"max": null,
+					"min": 0,
+					"step": 100,
+					"type": "parameter",
+					"unit": "ms",
+					"value": 100
+				},
+				{
+					"data_type": "double",
+					"id": "window_size",
+					"label": "Window",
+					"max": null,
+					"min": 0,
+					"step": 100,
+					"type": "parameter",
+					"unit": "ms",
+					"value": 1000
+				},
+				{
+					"id": "bits_per_second",
+					"label": "Bits",
+					"type": "statistic",
+					"unit": "bit/s"
+				},
+				{
+					"id": "bytes_per_second",
+					"label": "Bytes",
+					"type": "statistic",
+					"unit": "B/s"
+				},
+				{
+					"id": "packets_per_second",
+					"label": "Packets",
+					"type": "statistic",
+					"unit": "packets/s"
+				}
+			],
+			"position": 
+			{
+				"x": 981,
+				"y": 377
+			},
+			"removable": true,
+			"size": 
+			{
+				"height": 210,
+				"width": 250
+			},
+			"title": "Throughput Meter",
+			"type": "throughput_meter"
+		}
+	},
+	"paths": 
+	[
+		{
+			"from": 
+			{
+				"node": "delay_meter",
+				"port": "out"
+			},
+			"to": 
+			{
+				"node": "throughput_meter",
+				"port": "in"
+			}
+		},
+		{
+			"from": 
+			{
+				"node": "throughput_meter",
+				"port": "out"
+			},
+			"to": 
+			{
+				"node": "socket_sink",
+				"port": "in"
+			}
+		},
+		{
+			"from": 
+			{
+				"node": "fifo_queue",
+				"port": "in"
+			},
+			"to": 
+			{
+				"node": "socket_source",
+				"port": "out"
+			}
+		},
+		{
+			"from": 
+			{
+				"node": "fixed_interval_rate",
+				"port": "lr_in"
+			},
+			"to": 
+			{
+				"node": "fifo_queue",
+				"port": "out"
+			}
+		},
+		{
+			"from": 
+			{
+				"node": "fixed_interval_rate",
+				"port": "lr_out"
+			},
+			"to": 
+			{
+				"node": "fixed_delay",
+				"port": "lr_in"
+			}
+		},
+		{
+			"from": 
+			{
+				"node": "fixed_delay",
+				"port": "lr_out"
+			},
+			"to": 
+			{
+				"node": "delay_meter",
+				"port": "in"
+			}
+		},
+		{
+			"from": 
+			{
+				"node": "socket_source",
+				"port": "in"
+			},
+			"to": 
+			{
+				"node": "fixed_delay",
+				"port": "rl_out"
+			}
+		},
+		{
+			"from": 
+			{
+				"node": "fixed_delay",
+				"port": "rl_in"
+			},
+			"to": 
+			{
+				"node": "socket_sink",
+				"port": "out"
+			}
+		}
+	]
+}
